@@ -107,479 +107,568 @@
     <canvas id="c"></canvas>
 
     <script>
-      // ===== Canvas setup =====
-      const canvas = document.getElementById('c');
-      const ctx = canvas.getContext('2d');
-      let W, H;
-      function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
-      addEventListener('resize', resize); resize();
+    'use strict';
 
-      // ===== URL Params / Themes / RNG / Trend helpers =====
-      const params = new URLSearchParams(location.search);
+    // ===== Canvas setup =====
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    let W, H;
+    function resize(){ W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+    addEventListener('resize', resize); resize();
 
-      function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}}
-      const SEED = params.get('seed') ? parseInt(params.get('seed'),10) : (Math.random()*1e9)|0;
-      let rand = mulberry32(isFinite(SEED) ? SEED : 1);
+    // ===== URL Params / RNG =====
+    const params = new URLSearchParams(location.search);
+    function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}}
+    const SEED = params.get('seed') ? parseInt(params.get('seed'),10) : (Math.random()*1e9)|0;
+    let rand = mulberry32(isFinite(SEED) ? SEED : 1);
 
-      // Basis themes (start via ?trend=)
-      const THEMES = {
-        default:  {bg:'#0f1326', plat:'#3ef4a3', player:'#e6e6e6', filter:'none', banner:'#2b2f55', border:'#8aa3ff', star:'#ffffff'},
-        retro:    {bg:'#0b0b0b', plat:'#39ff14', player:'#e8e4cf', filter:'contrast(1.15) saturate(0.9)', banner:'#1c1c1c', border:'#86ffb6', star:'#eaeaea'},
-        sigma:    {bg:'#0b1220', plat:'#7cc7ff', player:'#ffffff', filter:'grayscale(0.1) contrast(1.25)', banner:'#101828', border:'#9ac7ff', star:'#dfe8ff'},
-        skibidi:  {bg:'#120b1a', plat:'#ff61d8', player:'#ffffff', filter:'hue-rotate(20deg) saturate(1.2)', banner:'#2b0f2e', border:'#ff9dee', star:'#ffe6f8'},
-        minecraft:{bg:'#1a2a16', plat:'#7dbb54', player:'#f5f1e6', filter:'contrast(1.2)', banner:'#2a3b1d', border:'#b0e38a', star:'#e9f8db'},
-        f1:       {bg:'#0a0a0a', plat:'#e10600', player:'#f5f5f5', filter:'contrast(1.3)', banner:'#161616', border:'#ff5e5e', star:'#ffffff'},
-        nasa:     {bg:'#03040a', plat:'#2b6cff', player:'#f1f7ff', filter:'brightness(1.05)', banner:'#0b1640', border:'#a9c4ff', star:'#dfe9ff'},
-      };
-      const THEME_NAME = (params.get('trend')||'default').toLowerCase();
-      const BASE = THEMES[THEME_NAME] || THEMES.default;
+    // ===== Helpers =====
+    function pick(arr){ return arr[(rand()*arr.length)|0]; }
 
-      // Retro palette-rotaties (random per 5 streaks)
-      const RETRO_PALETTES = [
-        {name:'crt',       bg:'#111016', plat:'#39ff14', player:'#f4f4f4', banner:'#1a1a1a', border:'#86ffb6', filter:'contrast(1.05)'},
-        {name:'neon',      bg:'#0b0d1a', plat:'#ff61d8', player:'#ffffff', banner:'#201235', border:'#ff9dee', filter:'saturate(1.2)'},
-        {name:'vapor',     bg:'#1a1224', plat:'#7cc7ff', player:'#ffe5ff', banner:'#1c1730', border:'#9ac7ff', filter:'brightness(1.05)'},
-        {name:'greenscr',  bg:'#00190c', plat:'#39ff14', player:'#e8ffe8', banner:'#00130a', border:'#86ffb6', filter:'contrast(1.1)'},
-        {name:'amber',     bg:'#1a1300', plat:'#ffb000', player:'#fff3d0', banner:'#291f00', border:'#ffd36a', filter:'contrast(1.08)'},
-        {name:'candy',     bg:'#161018', plat:'#ff79c6', player:'#f8f8f2', banner:'#221324', border:'#ffb3e1', filter:'saturate(1.15)'},
-        {name:'dusk',      bg:'#0f1326', plat:'#7df9ff', player:'#e6e6e6', banner:'#101b3a', border:'#b3ecff', filter:'brightness(1.06)'},
-        {name:'cobalt',    bg:'#061222', plat:'#2b6cff', player:'#f1f7ff', banner:'#0b1640', border:'#a9c4ff', filter:'brightness(1.05)'}
-      ];
+    // ===== Themes =====
+    const THEMES = {
+      default:  {bg:'#0f1326', plat:'#3ef4a3', player:'#e6e6e6', filter:'none', banner:'#2b2f55', border:'#8aa3ff', star:'#ffffff'},
+      retro:    {bg:'#0b0b0b', plat:'#39ff14', player:'#e8e4cf', filter:'contrast(1.15) saturate(0.9)', banner:'#1c1c1c', border:'#86ffb6', star:'#eaeaea'},
+      sigma:    {bg:'#0b1220', plat:'#7cc7ff', player:'#ffffff', filter:'grayscale(0.1) contrast(1.25)', banner:'#101828', border:'#9ac7ff', star:'#dfe8ff'},
+      skibidi:  {bg:'#120b1a', plat:'#ff61d8', player:'#ffffff', filter:'hue-rotate(20deg) saturate(1.2)', banner:'#2b0f2e', border:'#ff9dee', star:'#ffe6f8'},
+      minecraft:{bg:'#1a2a16', plat:'#7dbb54', player:'#f5f1e6', filter:'contrast(1.2)', banner:'#2a3b1d', border:'#b0e38a', star:'#e9f8db'},
+      f1:       {bg:'#0a0a0a', plat:'#e10600', player:'#f5f5f5', filter:'contrast(1.3)', banner:'#161616', border:'#ff5e5e', star:'#ffffff'},
+      nasa:     {bg:'#03040a', plat:'#2b6cff', player:'#f1f7ff', filter:'brightness(1.05)', banner:'#0b1640', border:'#a9c4ff', star:'#dfe9ff'},
+    };
+    const THEME_NAME = (params.get('trend')||'default').toLowerCase();
+    const BASE = THEMES[THEME_NAME] || THEMES.default;
 
-      // Actief theme: start = BASE, wisselt elke 5 streaks naar een retro palette
-      let ACTIVE = {...BASE};
-      function applyTheme(th){
-        ACTIVE = {...ACTIVE, ...th};
-        document.body.style.filter = ACTIVE.filter || 'none';
-        document.documentElement.style.setProperty('--hud-border', ACTIVE.border || '#3a3a3a');
+    const RETRO_PALETTES = [
+      {name:'crt',       bg:'#111016', plat:'#39ff14', player:'#f4f4f4', banner:'#1a1a1a', border:'#86ffb6', filter:'contrast(1.05)'},
+      {name:'neon',      bg:'#0b0d1a', plat:'#ff61d8', player:'#ffffff', banner:'#201235', border:'#ff9dee', filter:'saturate(1.2)'},
+      {name:'vapor',     bg:'#1a1224', plat:'#7cc7ff', player:'#ffe5ff', banner:'#1c1730', border:'#9ac7ff', filter:'brightness(1.05)'},
+      {name:'greenscr',  bg:'#00190c', plat:'#39ff14', player:'#e8ffe8', banner:'#00130a', border:'#86ffb6', filter:'contrast(1.1)'},
+      {name:'amber',     bg:'#1a1300', plat:'#ffb000', player:'#fff3d0', banner:'#291f00', border:'#ffd36a', filter:'contrast(1.08)'},
+      {name:'candy',     bg:'#161018', plat:'#ff79c6', player:'#f8f8f2', banner:'#221324', border:'#ffb3e1', filter:'saturate(1.15)'},
+      {name:'dusk',      bg:'#0f1326', plat:'#7df9ff', player:'#e6e6e6', banner:'#101b3a', border:'#b3ecff', filter:'brightness(1.06)'},
+      {name:'cobalt',    bg:'#061222', plat:'#2b6cff', player:'#f1f7ff', banner:'#0b1640', border:'#a9c4ff', filter:'brightness(1.05)'}
+    ];
+
+    let ACTIVE = {...BASE};
+    function applyTheme(th){
+      ACTIVE = {...ACTIVE, ...th};
+      document.body.style.filter = ACTIVE.filter || 'none';
+      document.documentElement.style.setProperty('--hud-border', ACTIVE.border || '#3a3a3a');
+    }
+    applyTheme(BASE);
+
+    // ===== Tags/Captions =====
+    const TREND_TAGS = (params.get('tags')?.split(',') || [
+      '#BeatMyScore','#DuetThis','#Streak','#Speedrun','#OneMoreTry','#Retro','#PixelArt','#Art','#Vaporware','#HTML5Game', 'SpaceGame', 'Gent', 'Belgium', 'Spectrum Gent', 'Programmeren'
+    ]).slice(0,10);
+    const CAPTIONS = [
+      'Beat my SEED op TikTok :)',
+      'Duet met je highscore!',
+      'Kun jij dit level halen zonder te vallen? 🔥',
+    ];
+    const HARD = params.get('hard') === '1';
+    const REC  = params.get('rec') === '1';
+    if (REC) document.getElementById('rec').style.display = 'inline-block';
+
+    const tagbar = document.getElementById('tagbar');
+    (function renderChips(){
+      const colors = ['c1','c2','c3','c4','c5'];
+      TREND_TAGS.forEach((t,i)=>{
+        const span = document.createElement('span');
+        span.className = 'chip ' + colors[i % colors.length];
+        span.textContent = t;
+        tagbar.appendChild(span);
+      });
+    })();
+
+    // ===== UI (copy/share) =====
+    const overlay = document.getElementById('gameover');
+    const finalScoreEl = document.getElementById('finalScore');
+    const btnCaption = document.getElementById('copyCaption');
+    const btnShare   = document.getElementById('shareSeed');
+
+    function buildCaption(){
+      const line = pick(CAPTIONS);
+      const tags = TREND_TAGS.join(' ');
+      return `${line} | Score: ${score} | Seed: ${SEED}\n${tags}`;
+    }
+    btnCaption?.addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(buildCaption()); btnCaption.textContent='✓ Copied!'; setTimeout(()=>btnCaption.textContent='Copy caption + hashtags',1200);}catch{}
+    });
+    btnShare?.addEventListener('click', async ()=>{
+      const url = new URL(location.href);
+      url.searchParams.set('seed', String(SEED));
+      url.searchParams.set('trend', THEME_NAME);
+      if (HARD) url.searchParams.set('hard','1');
+      try{ await navigator.clipboard.writeText(url.toString()); btnShare.textContent='✓ Link copied!'; setTimeout(()=>btnShare.textContent='Copy challenge link',1200);}catch{}
+    });
+
+    // ===== Audio =====
+    let audioCtx = null, audioReady = false;
+    function ensureAudio(){
+      try{
+        if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        if(audioCtx.state==='suspended') audioCtx.resume();
+        audioReady=true;
+      }catch(e){ audioReady=false; }
+    }
+    function beep({freq=800,dur=0.08,type='square',gain=0.15}={}){
+      if(!audioReady) return;
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.type=type; o.frequency.value=freq; g.gain.value=gain; o.connect(g).connect(audioCtx.destination);
+      const now=audioCtx.currentTime; o.start(now);
+      g.gain.setValueAtTime(gain,now); g.gain.exponentialRampToValueAtTime(0.001,now+dur);
+      o.stop(now+dur+0.01);
+    }
+    function sfxJump(){ beep({freq:900,dur:0.06,gain:0.18}); setTimeout(()=>beep({freq:1200,dur:0.05,gain:0.14}),35); }
+    function sfxCrash(){
+      if(!audioReady) return;
+      const now = audioCtx.currentTime;
+
+      // 1) Snelle 8-bit “fall” (twee golven dalen tegelijk)
+      const o1 = audioCtx.createOscillator();
+      const o2 = audioCtx.createOscillator();
+      const g1 = audioCtx.createGain();
+      o1.type = 'square';
+      o2.type = 'triangle';
+
+      o1.frequency.setValueAtTime(800, now);
+      o1.frequency.exponentialRampToValueAtTime(90, now + 0.35);
+      o2.frequency.setValueAtTime(1200, now);
+      o2.frequency.exponentialRampToValueAtTime(120, now + 0.35);
+
+      g1.gain.setValueAtTime(0.28, now);
+      g1.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+
+      o1.connect(g1); o2.connect(g1); g1.connect(audioCtx.destination);
+      o1.start(now);  o2.start(now);
+      o1.stop(now + 0.40); o2.stop(now + 0.40);
+
+      // 2) Korte noise-burst met low-pass sweep (explosief randje)
+      const durNoise = 0.25;
+      const noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * durNoise, audioCtx.sampleRate);
+      const data = noiseBuf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        // white noise met natuurlijke decay
+        data[i] = (Math.random()*2 - 1) * (1 - i / data.length);
+      }
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = noiseBuf;
+
+      const lp = audioCtx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(1200, now);
+      lp.frequency.exponentialRampToValueAtTime(220, now + 0.25);
+
+      const gN = audioCtx.createGain();
+      gN.gain.setValueAtTime(0.35, now + 0.02);   // iets later inzetten
+      gN.gain.linearRampToValueAtTime(0.0001, now + 0.27);
+
+      noise.connect(lp).connect(gN).connect(audioCtx.destination);
+      noise.start(now + 0.02);
+      noise.stop(now + 0.30);
+
+      // 3) Afsluitende “hit” (laag, detuned gevoel)
+      const hit = audioCtx.createOscillator();
+      const g2  = audioCtx.createGain();
+      hit.type = 'square';
+      hit.frequency.setValueAtTime(180, now + 0.32);
+      hit.frequency.exponentialRampToValueAtTime(60,  now + 0.52);
+      g2.gain.setValueAtTime(0.18, now + 0.32);
+      g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+      hit.connect(g2).connect(audioCtx.destination);
+      hit.start(now + 0.32);
+      hit.stop(now + 0.56);
+    }
+
+    function sfxChirp(){ beep({freq:2200,dur:0.03,gain:0.07}); setTimeout(()=>beep({freq:2600,dur:0.035,gain:0.06}),45); }
+    function sfxMotivate(){ beep({freq:1400,dur:0.05,gain:0.18}); setTimeout(()=>beep({freq:1800,dur:0.05,gain:0.16}),45); }
+    function sfxLevel(){ beep({freq:880,dur:0.05,gain:0.20}); setTimeout(()=>beep({freq:1175,dur:0.06,gain:0.18}),60); setTimeout(()=>beep({freq:1568,dur:0.07,gain:0.16}),120); }
+    function primeAudio(){ ensureAudio(); removeEventListener('pointerdown',primeAudio); removeEventListener('keydown',primeAudio); }
+    addEventListener('pointerdown',primeAudio,{once:true}); addEventListener('keydown',primeAudio,{once:true});
+
+    // ===== Clouds =====
+    const CLOUD_SPEED = 1.15;
+    const MSGS = ["LEER GAMES MAKEN BIJ HET SPECTRUM GENT","PROGRAMMEER BIJ HET SPECTRUM GENT"];
+    function makeCloud(x,y,scale=1,text=null){
+      const baseR=14, puff=[[0,0,baseR*1.1],[-16,4,baseR*0.9],[16,6,baseR*0.95],[-6,-8,baseR*0.85],[10,-10,baseR*0.8]];
+      return { x,y,scale,text,puff };
+    }
+    function roundRectPath(ctx,x,y,w,h,r){
+      const rr=Math.min(r,w*0.5,h*0.5);
+      ctx.beginPath(); ctx.moveTo(x+rr,y);
+      ctx.lineTo(x+w-rr,y); ctx.quadraticCurveTo(x+w,y,x+w,y+rr);
+      ctx.lineTo(x+w,y+h-rr); ctx.quadraticCurveTo(x+w,y+h,x+w-rr,y+h);
+      ctx.lineTo(x+rr,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-rr);
+      ctx.lineTo(x,y+rr); ctx.quadraticCurveTo(x,y,x+rr,y);
+    }
+    function drawCloudBanner(c){
+      const bannerScale=Math.min(1.9,Math.max(1,c.scale+0.1));
+      const padX=8*bannerScale, padY=5*bannerScale, fontSize=11*bannerScale;
+      ctx.save(); ctx.translate(30*c.scale,-20*c.scale);
+      ctx.font=`700 ${fontSize|0}px monospace`;
+      ctx.textBaseline='top';
+      ctx.shadowColor='rgba(0,0,0,0.6)';
+      ctx.shadowBlur=6;
+      const text = c.text || pick(['DUET: BEAT THIS SEED','LEER CODEN IN 15s','SIGMA JUMP? TRY IT','RETRO MODE 🔁','NO MISS STREAK 🔥']);
+      const textW=ctx.measureText(text).width;
+      const w=textW+padX*2, h=fontSize+padY*2, r=5*bannerScale;
+      ctx.fillStyle='rgba(0,0,0,0.35)'; roundRectPath(ctx,2,2,w,h,r); ctx.fill();
+      ctx.fillStyle=ACTIVE.banner; roundRectPath(ctx,0,0,w,h,r); ctx.fill();
+      ctx.lineWidth=Math.max(1,1.4*bannerScale); ctx.strokeStyle=ACTIVE.border; roundRectPath(ctx,0,0,w,h,r); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(12*bannerScale,h); ctx.lineTo(18*bannerScale,h); ctx.lineTo(15*bannerScale,h+6*bannerScale); ctx.closePath();
+      ctx.fillStyle=ACTIVE.banner; ctx.fill(); ctx.strokeStyle=ACTIVE.border; ctx.stroke();
+      ctx.fillStyle='#ffffff'; ctx.fillText(text,padX,padY);
+      ctx.restore();
+    }
+    function drawCloud(c){
+      ctx.save(); ctx.translate(c.x|0,c.y|0); ctx.scale(c.scale,c.scale);
+      const fill='rgba(235,245,255,0.95)';
+      ctx.beginPath();
+      for(const [px,py,r] of c.puff){ ctx.moveTo(px+r,py); ctx.arc(px,py,r,0,Math.PI*2); }
+      ctx.fillStyle=fill; ctx.fill();
+      ctx.lineJoin='round'; ctx.lineCap='round'; ctx.lineWidth=0.8; ctx.strokeStyle=fill; ctx.stroke();
+      ctx.beginPath();
+      for(const [px,py,r] of c.puff){ ctx.moveTo(px+r,py); ctx.arc(px,py,r*0.92,Math.PI*1.05,Math.PI*1.95); }
+      ctx.strokeStyle='rgba(255,255,255,0.30)'; ctx.lineWidth=1; ctx.stroke();
+      if(c.text) drawCloudBanner(c);
+      ctx.restore();
+    }
+    function spawnCloud(offscreenRight=true){
+      const x=offscreenRight?W+60+rand()*140:rand()*W;
+      const y=H*(0.14+rand()*0.30);
+      const scale=0.9+rand()*1.0;
+      const text=rand()<0.22?MSGS[(rand()*MSGS.length)|0]:null;
+      clouds.push(makeCloud(x,y,scale,text));
+    }
+
+    // ===== Birds =====
+    const BIRD_MIN_Y=0.35, BIRD_MAX_Y=0.55;
+    function spawnBird(offscreenRight=true){
+      const x=offscreenRight?W+40+rand()*120:rand()*W;
+      const y=H*(BIRD_MIN_Y+rand()*(BIRD_MAX_Y-BIRD_MIN_Y));
+      const speed=2+rand()*0.8; const seed=(rand()*1024)|0; const nextChirpFrame=t+30+((rand()*60)|0);
+      birds.push({x,y,speed,seed,nextChirpFrame});
+    }
+    function updateAndDrawBirds(){
+      for(let i=birds.length-1;i>=0;i--){
+        const b=birds[i];
+        if(!gameOver) b.x-=b.speed;
+        if(!gameOver && audioReady && b.x>0 && b.x<W && t>=b.nextChirpFrame){
+          sfxChirp(); b.nextChirpFrame=t+50+((rand()*80)|0);
+        }
+        const wingUp=(((t+b.seed)>>3)&1)===0;
+        ctx.save(); ctx.translate(b.x|0,b.y|0);
+        ctx.fillStyle='#f0f0f0'; ctx.fillRect(-6,-3,12,6);
+        ctx.fillRect(3,-4,5,5);
+        ctx.fillStyle='#111'; ctx.fillRect(6,-2,1,1);
+        ctx.fillStyle='#ffc866'; ctx.fillRect(8,-1,3,2);
+        ctx.fillStyle='#d9d9d9'; if(wingUp) ctx.fillRect(-3,-9,6,7); else ctx.fillRect(-3,2,6,7);
+        ctx.restore();
+        if(b.x<-60) birds.splice(i,1);
+      }
+      if(!birds.length || birds[birds.length-1].x < W-320){
+        if(rand()<0.03) spawnBird(true);
+      }
+    }
+
+    // ===== Streak & Popups =====
+    const STREAK_EMOJIS = ["💥","⚡","🚀","🌌","🎸","👾","🕹️","📟","🛸","🤯"];
+    let lastEmoji = null;
+    function pickStreakEmoji(streak){
+      let e = STREAK_EMOJIS[(rand()*STREAK_EMOJIS.length)|0];
+      if (e === lastEmoji && STREAK_EMOJIS.length > 1) {
+        e = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length];
+      }
+      lastEmoji = e;
+      if (streak >= 5 && rand() < 0.20) {
+        let e2 = STREAK_EMOJIS[(rand()*STREAK_EMOJIS.length)|0];
+        if (e2 === e && STREAK_EMOJIS.length > 1) {
+          e2 = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length];
+        }
+        return { text: e + " " + e2, combo: true };
+      }
+      return { text: e, combo: false };
+    }
+    const MOTOS = [
+      "✨ PERFECT!",
+      "🔥 You are nailing it",
+      "💪 Yes you can",
+      "😎 Oké José",
+      "🎯 Keep it rolling",
+      "🧠 Big brain moves",
+      "🚀 Speedrun vibes",
+      "🥷 Clean jumps!"
+    ];
+
+    // ===== Game state =====
+    const scoreEl = document.getElementById('score');
+    const player = { x: 80, y: 0, vy: 0, r: 16, onGround: false };
+    const gravity = 0.7, jumpVY = -12;
+    let t = 0, score = 0, level = 1;
+    let lastWasHardGap = false;
+    let gameOver = false;
+    let platforms = [], clouds = [], birds = [];
+    let streak = 0;
+    let popups = [];
+    let platformIdCounter = 1;
+    let lastCountedPlatformId = 0; // om 1-per-platform te garanderen
+
+    function addPopup(msg,x,y,style='normal'){ popups.push({msg,x,y,age:0,style}); }
+
+    // Glow
+    let platFlash = 0, platFlashHue = 0;
+    function triggerFlash(strength=1, hueRand=true){
+      platFlash = Math.max(platFlash, strength);
+      if (hueRand) platFlashHue = (rand()*360)|0;
+    }
+
+    // Palette switch (bij level-up)
+    let lastPaletteName = null;
+    function switchRetroPalette(){
+      let p = pick(RETRO_PALETTES);
+      if (p.name === lastPaletteName && RETRO_PALETTES.length > 1){
+        p = RETRO_PALETTES[(RETRO_PALETTES.indexOf(p)+1)%RETRO_PALETTES.length];
+      }
+      lastPaletteName = p.name;
+      applyTheme(p);
+      triggerFlash(1.0, true);
+      addPopup('🎨 PALETTE SHIFT!', player.x-30, Math.max(28, player.y-72), 'perfect');
+    }
+
+    // ===== Level gen =====
+    function reset(){
+      score=0; scoreEl.textContent=score;
+      platforms=[]; clouds=[]; birds=[]; lastWasHardGap=false;
+      platformIdCounter = 1;
+      lastCountedPlatformId = 0;
+      for(let i=0;i<6;i++) spawnCloud(false);
+      for(let i=0;i<2;i++) spawnBird(false);
+      const baseY=H*0.58, baseX=player.x-60;
+      platforms.push({id:platformIdCounter++, x:baseX,y:baseY,w:120,h:10});
+      player.y=baseY-player.r; player.vy=0; player.onGround=true;
+      lastCountedPlatformId = platforms[0].id; // startplatform telt niet
+      for(let i=1;i<8;i++){
+        const prev=platforms[i-1];
+        const x=prev.x+180+(rand()*40-20);
+        const y=Math.max(H*0.45,Math.min(H*0.85, baseY+Math.sin(i*0.6)*40+(rand()*40-20)));
+        platforms.push({id:platformIdCounter++, x,y,w:120,h:10});
       }
       applyTheme(BASE);
-
-      // HUD contrast aanpassen
-      document.documentElement.style.setProperty('--hud-border', ACTIVE.border || '#3a3a3a');
-
-      // Trending tags/captions (overschrijfbaar via ?tags=)
-      const TREND_TAGS = (params.get('tags')?.split(',') || [
-        '#FYP','#Coding','#Programmeren','#GameDev','#LearnOnTikTok','#DevLife','#Gent','#Belgium','#Retro','#HTML5Game'
-      ]).slice(0,10);
-      const CAPTIONS = [
-        'Beat my SEED and tag us 🎯',
-        '15s code → 1 game. Jij ook?',
-        'Duet met je highscore! 🔁',
-        'Kun jij dit level halen zonder te vallen? 🔥',
-      ];
-      const HARD = params.get('hard') === '1';
-      const REC  = params.get('rec') === '1';
-      if (REC) document.getElementById('rec').style.display = 'inline-block';
-
-      // Vul tag chips met kleurvariatie
-      const tagbar = document.getElementById('tagbar');
-      (function renderChips(){
-        const colors = ['c1','c2','c3','c4','c5'];
-        TREND_TAGS.forEach((t,i)=>{
-          const span = document.createElement('span');
-          span.className = 'chip ' + colors[i % colors.length];
-          span.textContent = t;
-          tagbar.appendChild(span);
-        });
-      })();
-
-      function pick(arr){ return arr[(rand()*arr.length)|0]; }
-
-      // ===== Streak emoji pool & helpers =====
-      const STREAK_EMOJIS = ["💥","⚡","🚀","🌌","🎸","👾","🕹️","📟","🛸","🤯"];
-      let lastEmoji = null;
-      function pickStreakEmoji(streak) {
-        let e = STREAK_EMOJIS[(rand()*STREAK_EMOJIS.length)|0];
-        if (e === lastEmoji && STREAK_EMOJIS.length > 1) {
-          e = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length];
-        }
-        lastEmoji = e;
-        if (streak >= 5 && rand() < 0.20) {
-          let e2 = STREAK_EMOJIS[(rand()*STREAK_EMOJIS.length)|0];
-          if (e2 === e && STREAK_EMOJIS.length > 1) {
-            e2 = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length];
-          }
-          return { text: e + " " + e2, combo: true };
-        }
-        return { text: e, combo: false };
+      level = 1;
+      streak = 0;
+      platFlash = 0;
+      lastPaletteName = null;
+    }
+    function nextPlatform(prev){
+      const makeHard=!lastWasHardGap && (HARD ? rand()<0.35 : rand()<0.22);
+      let x,y;
+      if(makeHard){
+        x=prev.x+240+(rand()*40-20);
+        y=Math.max(H*0.50, Math.min(H*0.80, prev.y+(rand()*20-10)));
+      } else {
+        x=prev.x+180+(rand()*40-20);
+        y=Math.max(H*0.45, Math.min(H*0.85, prev.y+Math.sin(t*0.06+rand())*40+(rand()*40-20)));
       }
+      lastWasHardGap=makeHard;
+      return {x,y};
+    }
+    function spawn(){
+      const last=platforms[platforms.length-1];
+      const np=nextPlatform(last);
+      platforms.push({id:platformIdCounter++, x:np.x,y:np.y,w:120,h:10});
+      if(platforms.length>10) platforms.shift();
+    }
 
-      // ===== Game state =====
-      const player = { x: 80, y: 0, vy: 0, r: 16, onGround: false };
-      const gravity = 0.7, jumpVY = -12;
-      let platforms = [], clouds = [], birds = [];
-      let lastWasHardGap = false;
-      let t = 0, score = 0;
-      const scoreEl = document.getElementById('score');
-
-      // === Streak & Popups ===
-      let streak = 0;
-      let popups = [];
-      function addPopup(msg,x,y,style='normal'){ popups.push({msg,x,y,age:0,style}); }
-
-      // === Platform flash (glow) ===
-      let platFlash = 0;         // intensiteit [0..1+]
-      let platFlashHue = 0;      // graden
-      function triggerFlash(strength=1, hueRand=true){
-        platFlash = Math.max(platFlash, strength);
-        if (hueRand) platFlashHue = (rand()*360)|0;
+    // ===== Controls =====
+    function jump(){
+      if(gameOver){ hideGameOver(); reset(); return; }
+      if(player.onGround){
+        player.vy=jumpVY; player.onGround=false; sfxJump();
       }
-
-      // Theme switch elke 5 streaks (random retro, geen herhaling)
-      let lastPaletteName = null;
-      function switchRetroPalette(){
-        // kies palette ≠ vorige
-        let p = pick(RETRO_PALETTES);
-        if (p.name === lastPaletteName && RETRO_PALETTES.length > 1){
-          p = RETRO_PALETTES[(RETRO_PALETTES.indexOf(p)+1)%RETRO_PALETTES.length];
-        }
-        lastPaletteName = p.name;
-        applyTheme(p);
-        triggerFlash(1.1, true);
-        addPopup('🎨 PALETTE SHIFT!', player.x-30, Math.max(28, player.y-72), 'perfect');
+    }
+    addEventListener('keydown',e=>{ if(e.code==='Space') jump(); });
+    addEventListener('pointerdown',e=>{
+      if(gameOver){
+        const isLink = e.target.closest && e.target.closest('a,button');
+        if(isLink) return;
       }
+      jump();
+    });
 
-      // === Game Over UI refs & state ===
-      const overlay = document.getElementById('gameover');
-      const finalScoreEl = document.getElementById('finalScore');
-      const btnCaption = document.getElementById('copyCaption');
-      const btnShare   = document.getElementById('shareSeed');
-      let gameOver = false;
-      function showGameOver(){ gameOver = true; finalScoreEl.textContent = score; overlay.style.display = 'grid'; }
-      function hideGameOver(){ overlay.style.display = 'none'; gameOver = false; streak = 0; platFlash = 0; applyTheme(BASE); lastPaletteName=null; }
+    // ===== Game Over + HUD =====
+    function showGameOver(){ gameOver = true; finalScoreEl.textContent = score; overlay.style.display = 'grid'; }
+    function hideGameOver(){
+      overlay.style.display = 'none';
+      gameOver = false;
+      streak = 0;
+      level = 1;
+      platFlash = 0;
+      applyTheme(BASE);
+      lastPaletteName = null;
+    }
+    (function adjustHUD(){
+      document.documentElement.style.setProperty('--hud-bg', 'rgba(0,0,0,.55)');
+      document.documentElement.style.setProperty('--hud-text', '#ffffff');
+      document.documentElement.style.setProperty('--hint-text', '#ffffff');
+    })();
 
-      function buildCaption(){
-        const line = pick(CAPTIONS);
-        const tags = TREND_TAGS.join(' ');
-        return `${line} | Score: ${score} | Seed: ${SEED}\n${tags}`;
-      }
-      btnCaption?.addEventListener('click', async ()=>{
-        try{ await navigator.clipboard.writeText(buildCaption()); btnCaption.textContent='✓ Copied!'; setTimeout(()=>btnCaption.textContent='Copy caption + hashtags',1200);}catch{}
-      });
-      btnShare?.addEventListener('click', async ()=>{
-        const url = new URL(location.href);
-        url.searchParams.set('seed', String(SEED));
-        url.searchParams.set('trend', THEME_NAME);
-        if (HARD) url.searchParams.set('hard','1');
-        try{ await navigator.clipboard.writeText(url.toString()); btnShare.textContent='✓ Link copied!'; setTimeout(()=>btnShare.textContent='Copy challenge link',1200);}catch{}
-      });
+    // ===== Main loop =====
+    let prevOnGround = true;
 
-      // ===== Audio (Web Audio API) =====
-      let audioCtx = null, audioReady = false;
-      function ensureAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); audioReady=true; }
-      function beep({freq=800,dur=0.08,type='square',gain=0.15}={}){ if(!audioReady)return; const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type=type; o.frequency.value=freq; g.gain.value=gain; o.connect(g).connect(audioCtx.destination); const now=audioCtx.currentTime; o.start(now); g.gain.setValueAtTime(gain,now); g.gain.exponentialRampToValueAtTime(0.001,now+dur); o.stop(now+dur+0.01); }
-      function sfxJump(){ beep({freq:900,dur:0.06,gain:0.18}); setTimeout(()=>beep({freq:1200,dur:0.05,gain:0.14}),35); }
-      function sfxCrash(){ if(!audioReady)return; const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type='square'; o.connect(g).connect(audioCtx.destination); const now=audioCtx.currentTime; g.gain.setValueAtTime(0.18,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.18); o.frequency.setValueAtTime(600,now); o.frequency.exponentialRampToValueAtTime(80,now+0.18); o.start(now); o.stop(now+0.2); }
-      function sfxChirp(){ beep({freq:2200,dur:0.03,gain:0.07}); setTimeout(()=>beep({freq:2600,dur:0.035,gain:0.06}),45); }
-      function sfxPerfect(){ beep({freq:1400,dur:0.05,gain:0.2}); setTimeout(()=>beep({freq:1800,dur:0.06,gain:0.18}),40); }
+    function loop(){
+      t++;
 
-      function primeAudio(){ ensureAudio(); removeEventListener('pointerdown',primeAudio); removeEventListener('keydown',primeAudio); }
-      addEventListener('pointerdown',primeAudio,{once:true}); addEventListener('keydown',primeAudio,{once:true});
+      if(!gameOver){
+        const wasOnGround = prevOnGround;
 
-      // ===== Cloud helpers =====
-      const CLOUD_SPEED = 1.15;
-      const MSGS = ["LEER GAMES MAKEN BIJ HET SPECTRUM GENT","PROGRAMMEER BIJ HET SPECTRUM GENT"];
+        // physics
+        player.vy += gravity;
+        player.y  += player.vy;
 
-      function makeCloud(x,y,scale=1,text=null){
-        const baseR=14, puff=[[0,0,baseR*1.1],[-16,4,baseR*0.9],[16,6,baseR*0.95],[-6,-8,baseR*0.85],[10,-10,baseR*0.8]];
-        return { x,y,scale,text,puff };
-      }
+        // clouds
+        for(const c of clouds) c.x -= CLOUD_SPEED * (0.85 + (c.scale - 1) * 0.35);
+        while(clouds.length && clouds[0].x < -260) clouds.shift();
+        if(!clouds.length || clouds[clouds.length-1].x < W-260){ if(rand()<0.6) spawnCloud(true); }
 
-      // Wolk-render zonder cirkel-naden + highlight
-      function drawCloud(c){
-        ctx.save();
-        ctx.translate(c.x|0,c.y|0);
-        ctx.scale(c.scale,c.scale);
+        // scroll (5% sneller per level)
+        const BASE_SCROLL = HARD ? 3.8 : 3.0;
+        const SCROLL = BASE_SCROLL * Math.pow(1.05, (level - 1));
+        for (const p of platforms) p.x -= SCROLL;
 
-        const fill = 'rgba(235,245,255,0.95)';
+        // spawn nieuwe platforms als de eerste weg is
+        if(platforms[0].x + platforms[0].w < 0){ spawn(); }
 
-        // 1) Alle puffs in één fill
-        ctx.beginPath();
-        for (const [px,py,r] of c.puff) { ctx.moveTo(px+r,py); ctx.arc(px,py,r,0,Math.PI*2); }
-        ctx.fillStyle = fill;
-        ctx.fill();
-
-        // 2) Stroke = fill (naden weg)
-        ctx.lineJoin = 'round';
-        ctx.lineCap  = 'round';
-        ctx.lineWidth = 0.8;
-        ctx.strokeStyle = fill;
-        ctx.stroke();
-
-        // 3) Zachte highlight bovenaan
-        ctx.beginPath();
-        for (const [px,py,r] of c.puff) { ctx.moveTo(px+r,py); ctx.arc(px,py,r*0.92,Math.PI*1.05,Math.PI*1.95); }
-        ctx.strokeStyle = 'rgba(255,255,255,0.30)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        if(c.text) drawCloudBanner(c);
-        ctx.restore();
-      }
-
-      function drawCloudBanner(c){
-        const bannerScale=Math.min(1.9,Math.max(1,c.scale+0.1));
-        const padX=8*bannerScale, padY=5*bannerScale, fontSize=11*bannerScale;
-        ctx.save(); ctx.translate(30*c.scale,-20*c.scale);
-        ctx.font=`700 ${fontSize|0}px monospace`;
-        ctx.textBaseline='top';
-        ctx.shadowColor='rgba(0,0,0,0.6)';
-        ctx.shadowBlur=6;
-        const text = c.text || pick(['DUET: BEAT THIS SEED','LEER CODEN IN 15s','SIGMA JUMP? TRY IT','RETRO MODE 🔁','NO MISS STREAK 🔥']);
-        const textW=ctx.measureText(text).width;
-        const w=textW+padX*2, h=fontSize+padY*2, r=5*bannerScale;
-        // glow achtergrond
-        ctx.fillStyle='rgba(0,0,0,0.35)'; roundRectPath(ctx,2,2,w,h,r); ctx.fill();
-        // banner
-        ctx.fillStyle=ACTIVE.banner; roundRectPath(ctx,0,0,w,h,r); ctx.fill();
-        ctx.lineWidth=Math.max(1,1.4*bannerScale); ctx.strokeStyle=ACTIVE.border; roundRectPath(ctx,0,0,w,h,r); ctx.stroke();
-        // staartje
-        ctx.beginPath(); ctx.moveTo(12*bannerScale,h); ctx.lineTo(18*bannerScale,h); ctx.lineTo(15*bannerScale,h+6*bannerScale); ctx.closePath();
-        ctx.fillStyle=ACTIVE.banner; ctx.fill(); ctx.strokeStyle=ACTIVE.border; ctx.stroke();
-        // tekst
-        ctx.fillStyle='#ffffff'; ctx.fillText(text,padX,padY);
-        ctx.restore();
-      }
-
-      function roundRectPath(ctx,x,y,w,h,r){
-        const rr=Math.min(r,w*0.5,h*0.5);
-        ctx.beginPath(); ctx.moveTo(x+rr,y);
-        ctx.lineTo(x+w-rr,y); ctx.quadraticCurveTo(x+w,y,x+w,y+rr);
-        ctx.lineTo(x+w,y+h-rr); ctx.quadraticCurveTo(x+w,y+h,x+w-rr,y+h);
-        ctx.lineTo(x+rr,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-rr);
-        ctx.lineTo(x,y+rr); ctx.quadraticCurveTo(x,y,x+rr,y);
-      }
-
-      function spawnCloud(offscreenRight=true){
-        const x=offscreenRight?W+60+rand()*140:rand()*W;
-        const y=H*(0.14+rand()*0.30);
-        const scale=0.9+rand()*1.0;
-        const text=rand()<0.22?MSGS[(rand()*MSGS.length)|0]:null;
-        clouds.push(makeCloud(x,y,scale,text));
-      }
-
-      // ===== Birds =====
-      const BIRD_MIN_Y=0.35, BIRD_MAX_Y=0.55;
-      function spawnBird(offscreenRight=true){
-        const x=offscreenRight?W+40+rand()*120:rand()*W;
-        const y=H*(BIRD_MIN_Y+rand()*(BIRD_MAX_Y-BIRD_MIN_Y));
-        const speed=2+rand()*0.8; const seed=(rand()*1024)|0; const nextChirpFrame=t+30+((rand()*60)|0);
-        birds.push({x,y,speed,seed,nextChirpFrame});
-      }
-      function updateAndDrawBirds(){
-        for(let i=birds.length-1;i>=0;i--){
-          const b=birds[i];
-          if(!gameOver) b.x-=b.speed;
-          if(!gameOver && audioReady && b.x>0 && b.x<W && t>=b.nextChirpFrame){
-            sfxChirp(); b.nextChirpFrame=t+50+((rand()*80)|0);
-          }
-          const wingUp=(((t+b.seed)>>3)&1)===0;
-          ctx.save(); ctx.translate(b.x|0,b.y|0);
-          ctx.fillStyle='#f0f0f0'; ctx.fillRect(-6,-3,12,6);
-          ctx.fillRect(3,-4,5,5);
-          ctx.fillStyle='#111'; ctx.fillRect(6,-2,1,1);
-          ctx.fillStyle='#ffc866'; ctx.fillRect(8,-1,3,2);
-          ctx.fillStyle='#d9d9d9'; if(wingUp) ctx.fillRect(-3,-9,6,7); else ctx.fillRect(-3,2,6,7);
-          ctx.restore();
-          if(b.x<-60) birds.splice(i,1);
-        }
-        if(!birds.length || birds[birds.length-1].x < W-320){
-          if(rand()<0.03) spawnBird(true);
-        }
-      }
-
-      // ===== Level generation =====
-      function reset(){
-        score=0; scoreEl.textContent=score;
-        platforms=[]; clouds=[]; birds=[]; lastWasHardGap=false;
-        for(let i=0;i<6;i++) spawnCloud(false);
-        for(let i=0;i<2;i++) spawnBird(false);
-        const baseY=H*0.58, baseX=player.x-60;
-        platforms.push({x:baseX,y:baseY,w:120,h:10});
-        player.y=baseY-player.r; player.vy=0; player.onGround=true;
-        for(let i=1;i<8;i++){
-          const prev=platforms[i-1];
-          const x=prev.x+180+(rand()*40-20);
-          const y=Math.max(H*0.45,Math.min(H*0.85, baseY+Math.sin(i*0.6)*40+(rand()*40-20)));
-          platforms.push({x,y,w:120,h:10});
-        }
-        applyTheme(BASE); // reset naar basis
-      }
-
-      function nextPlatform(prev){
-        const makeHard=!lastWasHardGap && (HARD ? rand()<0.35 : rand()<0.22);
-        let x,y;
-        if(makeHard){
-          x=prev.x+240+(rand()*40-20);
-          y=Math.max(H*0.50, Math.min(H*0.80, prev.y+(rand()*20-10)));
-        } else {
-          x=prev.x+180+(rand()*40-20);
-          y=Math.max(H*0.45, Math.min(H*0.85, prev.y+Math.sin(t*0.06+rand())*40+(rand()*40-20)));
-        }
-        lastWasHardGap=makeHard;
-        return {x,y};
-      }
-
-      function spawn(){
-        const last=platforms[platforms.length-1];
-        const np=nextPlatform(last);
-        platforms.push({x:np.x,y:np.y,w:120,h:10});
-        if(platforms.length>10) platforms.shift();
-      }
-
-      // ===== Controls =====
-      function jump(){
-        if(gameOver){ hideGameOver(); reset(); return; }
-        if(player.onGround){
-          player.vy=jumpVY; player.onGround=false; sfxJump();
-        }
-      }
-      addEventListener('keydown',e=>{ if(e.code==='Space') jump(); });
-      addEventListener('pointerdown',e=>{
-        if(gameOver){
-          const isLink = e.target.closest && e.target.closest('a,button');
-          if(isLink) return;
-        }
-        jump();
-      });
-
-      // ===== Main loop =====
-      let prevOnGround = true;
-
-      function loop(){
-        t++;
-
-        if(!gameOver){
-          const wasOnGround = prevOnGround;
-
-          player.vy += gravity;
-          player.y  += player.vy;
-
-          for(const c of clouds) c.x -= 1.15 * (0.85 + (c.scale - 1) * 0.35);
-          while(clouds.length && clouds[0].x < -260) clouds.shift();
-          if(!clouds.length || clouds[clouds.length-1].x < W-260){ if(rand()<0.6) spawnCloud(true); }
-
-          const SCROLL = HARD ? 3.8 : 3.0;
-          for(const p of platforms) p.x -= SCROLL;
-
-          // Collision
-          player.onGround = false;
-          for(const p of platforms){
-            if(player.x > p.x - player.r && player.x < p.x + p.w + player.r){
-              if(player.y + player.r > p.y && player.y + player.r < p.y + p.h + 10 && player.vy >= 0){
-                player.y = p.y - player.r; player.vy = 0; player.onGround = true;
-              }
+        // collision + landing detectie
+        let platformUnderfoot = null;
+        player.onGround = false;
+        for(const p of platforms){
+          if(player.x > p.x - player.r && player.x < p.x + p.w + player.r){
+            if(player.y + player.r > p.y && player.y + player.r < p.y + p.h + 10 && player.vy >= 0){
+              player.y = p.y - player.r; player.vy = 0; player.onGround = true;
+              platformUnderfoot = p;
+              break;
             }
           }
-          prevOnGround = player.onGround;
+        }
 
-          // Score / streak — alleen als vorige frame OP DE GROND
-          if(platforms[0].x + platforms[0].w < 0){
-            spawn();
-            if (wasOnGround) {
-              score++; scoreEl.textContent = score;
-              streak++;
+        // landing event = net op de grond NA in de lucht
+        if (player.onGround && !wasOnGround && platformUnderfoot) {
+          if (platformUnderfoot.id !== lastCountedPlatformId) {
+            // 1) Score + streak
+            score++; scoreEl.textContent = score;
+            streak++;
+            lastCountedPlatformId = platformUnderfoot.id;
+
+            // 2) Elke 3 landingen: emoji-streak
+            if (streak % 3 === 0) {
               const pickRes = pickStreakEmoji(streak);
-              addPopup(`${pickRes.text} STREAK x${streak}`, player.x+20, Math.max(40, player.y-40));
+              addPopup(`${pickRes.text} STREAK x${streak}`, player.x+20, Math.max(40, player.y-40), 'streak');
+              if (pickRes.combo) triggerFlash(0.55, true);
+            }
 
-              // PERFECT + palette/glow bij 5,10,15,...
-              if (streak % 5 === 0){
-                addPopup(`✨ PERFECT!`, player.x-18, Math.max(30, player.y-64), 'perfect');
-                sfxPerfect();
-                switchRetroPalette(); // <<< palette shift
-              }
-              // Extra glow bij elke 10 streaks
-              if (streak % 10 === 0){
-                triggerFlash(1.2, true);
-              }
-              // Glow bij combo-emoji
-              if (pickRes.combo){
-                triggerFlash(0.65, true);
-              }
+            // 3) Elke 5 streaks: motivatie + sfx
+            if (streak % 5 === 0) {
+              addPopup(pick(MOTOS), player.x-18, Math.max(30, player.y-64), 'perfect');
+              sfxMotivate();
+              triggerFlash(0.7, true);
+            }
+
+            // 4) Elke 10 streaks: level up + palette + sfx
+            if (streak % 10 === 0) {
+              level++;
+              switchRetroPalette();
+              sfxLevel();
+              addPopup(`LEVEL ${level}`, player.x-28, Math.max(24, player.y-80), 'level');
+              triggerFlash(1.2, true);
             }
           }
-
-          if(player.y > H + 100){ sfxCrash(); showGameOver(); }
         }
 
-        // ===== Render =====
-        ctx.clearRect(0,0,W,H);
+        prevOnGround = player.onGround;
 
-        // Achtergrond + sterren
-        ctx.fillStyle = ACTIVE.bg; ctx.fillRect(0,0,W,H);
-        for(let i=0;i<60;i++){
-          ctx.fillStyle='rgba(255,255,255,0.07)';
-          ctx.fillRect((i*73+t)%W,(i*37)%H,2,2);
-        }
-
-        // Vogels onder wolken
-        updateAndDrawBirds();
-
-        // Wolken + banners
-        for(const c of clouds) drawCloud(c);
-
-        // Platforms (hoog contrast) + glow
-        ctx.save();
-        if (platFlash > 0.01){
-          ctx.shadowColor = `hsl(${platFlashHue}, 90%, 65%)`;
-          ctx.shadowBlur  = 20 * platFlash;
-        }
-        ctx.fillStyle = ACTIVE.plat;
-        for(const p of platforms) ctx.fillRect(p.x,p.y,p.w,p.h);
-        ctx.restore();
-
-        // Speler
-        ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
-        ctx.fillStyle = ACTIVE.player; ctx.fill();
-        ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.stroke();
-
-        // Popups
-        for(let i=popups.length-1;i>=0;i--){
-          const p=popups[i];
-          p.age++;
-          const life = p.style==='perfect' ? 72 : 60;
-          const alpha = Math.max(0, 1 - p.age/life);
-          const scale = 1 + Math.max(0, (12 - p.age) / 60);
-          ctx.save();
-          ctx.globalAlpha = alpha;
-          ctx.translate(p.x, p.y - p.age*0.5);
-          ctx.scale(scale, scale);
-          ctx.font = p.style==='perfect' ? '800 18px monospace' : '700 16px monospace';
-          const fill = p.style==='perfect' ? '#ffe9a8' : '#ffffff';
-          const stroke = p.style==='perfect' ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.6)';
-          ctx.fillStyle = fill;
-          ctx.strokeStyle = stroke; ctx.lineWidth=3;
-          ctx.strokeText(p.msg, 0, 0);
-          ctx.fillText(p.msg, 0, 0);
-          ctx.restore();
-          if(p.age>life) popups.splice(i,1);
-        }
-
-        // Flash decay
-        platFlash *= 0.90;
-
-        requestAnimationFrame(loop);
+        // fail
+        if(player.y > H + 100){ sfxCrash(); showGameOver(); }
       }
 
-      function start(){ hideGameOver(); reset(); loop(); }
-      start();
+      // ===== Render =====
+      ctx.clearRect(0,0,W,H);
 
-      // ===== Mini API =====
-      const game = {
-        get score(){ return score; },
-        set score(v){ score = v|0; scoreEl.textContent = score; },
-        flash(){ document.body.style.filter='invert(1) hue-rotate(180deg)'; setTimeout(()=>document.body.style.filter=ACTIVE.filter||'none',200); },
-        seed: SEED, theme: THEME_NAME, hard: (params.get('hard')==='1')
-      };
-      window.game = game;
+      // bg + stars
+      ctx.fillStyle = ACTIVE.bg; ctx.fillRect(0,0,W,H);
+      for(let i=0;i<60;i++){
+        ctx.fillStyle='rgba(255,255,255,0.07)';
+        ctx.fillRect((i*73+t)%W,(i*37)%H,2,2);
+      }
 
-      // ===== Leesbaarheid HUD dynamisch finetunen op basis van ACTIVE =====
-      (function adjustHUD(){
-        document.documentElement.style.setProperty('--hud-bg', 'rgba(0,0,0,.55)');
-        document.documentElement.style.setProperty('--hud-text', '#ffffff');
-        document.documentElement.style.setProperty('--hint-text', '#ffffff');
-      })();
+      // birds
+      updateAndDrawBirds();
+
+      // clouds
+      for(const c of clouds) drawCloud(c);
+
+      // platforms + glow
+      ctx.save();
+      if (platFlash > 0.01){
+        ctx.shadowColor = `hsl(${platFlashHue}, 90%, 65%)`;
+        ctx.shadowBlur  = 20 * platFlash;
+      }
+      ctx.fillStyle = ACTIVE.plat;
+      for(const p of platforms) ctx.fillRect(p.x,p.y,p.w,p.h);
+      ctx.restore();
+
+      // player
+      ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
+      ctx.fillStyle = ACTIVE.player; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.stroke();
+
+      // popups
+      for(let i=popups.length-1;i>=0;i--){
+        const p=popups[i];
+        p.age++;
+        const life =
+          p.style==='level'    ? 80 :
+          p.style==='perfect'  ? 72 :
+          p.style==='streak'   ? 60 : 60;
+
+        const alpha = Math.max(0, 1 - p.age/life);
+        const scale = 1 + Math.max(0, (12 - p.age) / 60);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(p.x, p.y - p.age*0.5);
+        ctx.scale(scale, scale);
+
+        let font = '700 16px monospace';
+        let fill = '#ffffff';
+        if (p.style==='perfect') { font='800 18px monospace'; fill='#ffe9a8'; }
+        if (p.style==='level')   { font='800 20px monospace'; fill='#c7fff0'; }
+
+        ctx.font = font;
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth=3;
+        ctx.strokeText(p.msg, 0, 0);
+        ctx.fillText(p.msg, 0, 0);
+        ctx.restore();
+        if(p.age>life) popups.splice(i,1);
+      }
+
+      // flash decay
+      platFlash *= 0.90;
+
+      requestAnimationFrame(loop);
+    }
+
+    function start(){ hideGameOver(); reset(); loop(); }
+    start();
+
+    // ===== Mini API =====
+    const game = {
+      get score(){ return score; },
+      set score(v){ score = v|0; scoreEl.textContent = score; },
+      flash(){ document.body.style.filter='invert(1) hue-rotate(180deg)'; setTimeout(()=>document.body.style.filter=ACTIVE.filter||'none',200); },
+      seed: SEED, theme: THEME_NAME, hard: (params.get('hard')==='1')
+    };
+    window.game = game;
     </script>
   </body>
 </html>
