@@ -10,6 +10,12 @@
         --hud-border: #3a3a3a;
         --hud-text: #ffffff;
         --hint-text: #e6e6e6;
+
+        /* Spectrum-blauw */
+        --brand-1: #111525;
+        --brand-2: #2b2f55;
+        --brand-3: #8aa3ff;
+        --brand-4: #cfe0ff;
       }
       html, body { margin: 0; padding: 0; background: #0a0a0a; color: #e6e6e6; font-family: monospace; }
       #hud {
@@ -36,7 +42,6 @@
       #gameover p  { margin: 6px 0; font-size: 16px; opacity: .95; }
       #gameover .score { font-size: 20px; margin-top: 4px; font-weight: 700; }
 
-      /* Opleiding-link opvallend */
       .cta-opleiding {
         display: inline-block; margin-top: 12px; padding: 10px 14px; cursor: pointer;
         background: linear-gradient(135deg,#6ea8ff,#8aa3ff 40%,#b1c6ff);
@@ -47,7 +52,6 @@
       }
       .cta-opleiding:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(138,163,255,.32), inset 0 -2px 0 rgba(0,0,0,.18); }
 
-      /* Copy/Share knoppen */
       #gameover a.minibtn, #gameover button.minibtn {
         display:inline-block; margin-top:10px; padding:8px 12px; cursor:pointer;
         background:#2b2f55; border:1px solid #8aa3ff; border-radius:6px; color:#fff; text-decoration:none;
@@ -55,7 +59,6 @@
       }
       #gameover a.minibtn:hover, #gameover button.minibtn:hover { transform: translateY(-1px); }
 
-      /* Tag chips (kleurrijk, non-click) */
       .tagbar { margin-top: 12px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
       .chip {
         padding:6px 10px; border-radius:999px; font-weight:700; font-size:12px;
@@ -69,7 +72,6 @@
 
       #gameover .hint { margin-top: 12px; font-size: 14px; opacity: .85; }
 
-      /* Opname-overlay (optioneel via ?rec=1) */
       #rec {
         position: fixed; top: 10px; right: 12px; z-index: 5; display: none;
         font-weight: 700; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.7);
@@ -81,10 +83,37 @@
         animation: blink 1s infinite;
       }
       @keyframes blink { 0%, 60% { opacity: 1 } 61%, 100% { opacity: .25 } }
+
+      /* === Startscreen === */
+      #startscreen {
+        position:fixed; inset:0; display:grid; place-items:center; z-index:10;
+        background: radial-gradient(ellipse at center, rgba(11,16,32,.95), rgba(0,0,0,.88));
+        color:#fff;
+      }
+      #startscreen .card {
+        text-align:center; padding: 20px 22px; border: 1px solid var(--brand-3); border-radius: 12px;
+        background: var(--brand-1); box-shadow: 0 10px 36px rgba(0,0,0,0.55);
+        max-width: min(92vw, 640px); color:#fff;
+      }
+      #startscreen h1{ margin:0 0 8px; font-size:28px; letter-spacing:.5px; text-shadow:0 3px 8px rgba(0,0,0,.8); }
+      #startscreen .sub{ opacity:.9; margin-top:6px; font-size:14px; }
+      .speedbar{ display:flex; gap:8px; justify-content:center; margin-top:10px; flex-wrap:wrap; }
+      .spdbtn{
+        padding:8px 12px; font-size:16px; cursor:pointer;
+        background:#2b2f55; border:1px solid #8aa3ff; border-radius:999px; color:#fff;
+        box-shadow: 0 6px 16px rgba(138,163,255,.22), inset 0 -2px 0 rgba(0,0,0,.15);
+      }
+      .spdbtn.active{ outline:2px solid #8aa3ff; background:#30366b; }
+      #startBtn{
+        padding:10px 16px; font-size:18px; cursor:pointer; margin-top:12px;
+        background:#2b2f55; border:1px solid #8aa3ff; border-radius:8px; color:#fff;
+        box-shadow: 0 8px 20px rgba(138,163,255,.22), inset 0 -2px 0 rgba(0,0,0,.15);
+      }
+      #startBtn:hover{ transform: translateY(-1px); box-shadow: 0 10px 26px rgba(138,163,255,.32), inset 0 -2px 0 rgba(0,0,0,.18); }
     </style>
   </head>
   <body>
-    <div id="hud">Score: <span id="score">0</span> | Space/Click = Jump</div>
+    <div id="hud">Score: <span id="score">0</span> | Space/↑/Click = Jump</div>
     <div id="rec"><span class="dot"></span>REC</div>
     <div id="hint">developed by <code>Het Spectrum Gent</code></div>
 
@@ -106,8 +135,58 @@
 
     <canvas id="c"></canvas>
 
+    <!-- Startscreen -->
+    <div id="startscreen">
+      <div class="card">
+        <h1>Mini Jump Game</h1>
+        <div class="sub">Space / Click / ↑ om te springen • Seed: <span id="seedValue">—</span></div>
+        <div class="speedbar" id="speedbar">
+          <button class="spdbtn" data-speed="2.4">🐢 Turtle</button>
+          <button class="spdbtn" data-speed="3.0">🐇 Rabbit</button>
+          <button class="spdbtn" data-speed="3.8">🐆 Leopard</button>
+        </div>
+        <button id="startBtn">▶ Start</button>
+      </div>
+    </div>
+
     <script>
     'use strict';
+
+    // ===== URL Params / RNG =====
+    const params = new URLSearchParams(location.search);
+    function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}}
+    const SEED = params.get('seed') ? parseInt(params.get('seed'),10) : (Math.random()*1e9)|0;
+    let rand = mulberry32(isFinite(SEED) ? SEED : 1);
+
+    // ===== Startscreen wiring =====
+    const startScreen = document.getElementById("startscreen");
+    const startBtn = document.getElementById("startBtn");
+    const seedValueEl = document.getElementById("seedValue");
+    const speedbar = document.getElementById("speedbar");
+    seedValueEl.textContent = isFinite(SEED) ? SEED : '—';
+
+    const HARD = params.get('hard') === '1';
+    const SPEED_PARAM = parseFloat(params.get('speed'));
+    const BASE_SCROLL_FALLBACK = HARD ? 3.8 : 3.0;
+    let chosenSpeed = Number.isFinite(SPEED_PARAM) ? SPEED_PARAM : null;
+    function updateActiveButtons(){
+      document.querySelectorAll('.spdbtn').forEach(b=>{
+        const s = parseFloat(b.dataset.speed);
+        b.classList.toggle('active', chosenSpeed === s);
+      });
+    }
+    speedbar.addEventListener('click', (e)=>{
+      const b = e.target.closest('.spdbtn');
+      if(!b) return;
+      chosenSpeed = parseFloat(b.dataset.speed);
+      updateActiveButtons();
+    });
+    updateActiveButtons();
+
+    startBtn.addEventListener("click", ()=>{
+      startScreen.style.display="none";
+      start();
+    });
 
     // ===== Canvas setup =====
     const canvas = document.getElementById('c');
@@ -116,20 +195,16 @@
     function resize(){ W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
     addEventListener('resize', resize); resize();
 
-    // ===== URL Params / RNG =====
-    const params = new URLSearchParams(location.search);
-    function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}}
-    const SEED = params.get('seed') ? parseInt(params.get('seed'),10) : (Math.random()*1e9)|0;
-    let rand = mulberry32(isFinite(SEED) ? SEED : 1);
-
     // ===== Helpers =====
     function pick(arr){ return arr[(rand()*arr.length)|0]; }
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const randRange = (a,b) => a + rand()*(b-a);
 
     // ===== Themes =====
     const THEMES = {
       default:  {bg:'#0f1326', plat:'#3ef4a3', player:'#e6e6e6', filter:'none', banner:'#2b2f55', border:'#8aa3ff', star:'#ffffff'},
       retro:    {bg:'#0b0b0b', plat:'#39ff14', player:'#e8e4cf', filter:'contrast(1.15) saturate(0.9)', banner:'#1c1c1c', border:'#86ffb6', star:'#eaeaea'},
-      sigma:    {bg:'#0b1220', plat:'#7cc7ff', player:'#ffffff', filter:'grayscale(0.1) contrast(1.25)', banner:'#101828', border:'#9ac7ff', star:'#dfe8ff'},
+      sigma:    {bg:'#0b1220', plat:'#7cc7ff', player:'#ffffff', filter:'grayscale(1) contrast(1.25)', banner:'#101828', border:'#9ac7ff', star:'#dfe8ff'},
       skibidi:  {bg:'#120b1a', plat:'#ff61d8', player:'#ffffff', filter:'hue-rotate(20deg) saturate(1.2)', banner:'#2b0f2e', border:'#ff9dee', star:'#ffe6f8'},
       minecraft:{bg:'#1a2a16', plat:'#7dbb54', player:'#f5f1e6', filter:'contrast(1.2)', banner:'#2a3b1d', border:'#b0e38a', star:'#e9f8db'},
       f1:       {bg:'#0a0a0a', plat:'#e10600', player:'#f5f5f5', filter:'contrast(1.3)', banner:'#161616', border:'#ff5e5e', star:'#ffffff'},
@@ -139,14 +214,14 @@
     const BASE = THEMES[THEME_NAME] || THEMES.default;
 
     const RETRO_PALETTES = [
-      {name:'crt',       bg:'#111016', plat:'#39ff14', player:'#f4f4f4', banner:'#1a1a1a', border:'#86ffb6', filter:'contrast(1.05)'},
-      {name:'neon',      bg:'#0b0d1a', plat:'#ff61d8', player:'#ffffff', banner:'#201235', border:'#ff9dee', filter:'saturate(1.2)'},
-      {name:'vapor',     bg:'#1a1224', plat:'#7cc7ff', player:'#ffe5ff', banner:'#1c1730', border:'#9ac7ff', filter:'brightness(1.05)'},
-      {name:'greenscr',  bg:'#00190c', plat:'#39ff14', player:'#e8ffe8', banner:'#00130a', border:'#86ffb6', filter:'contrast(1.1)'},
-      {name:'amber',     bg:'#1a1300', plat:'#ffb000', player:'#fff3d0', banner:'#291f00', border:'#ffd36a', filter:'contrast(1.08)'},
-      {name:'candy',     bg:'#161018', plat:'#ff79c6', player:'#f8f8f2', banner:'#221324', border:'#ffb3e1', filter:'saturate(1.15)'},
-      {name:'dusk',      bg:'#0f1326', plat:'#7df9ff', player:'#e6e6e6', banner:'#101b3a', border:'#b3ecff', filter:'brightness(1.06)'},
-      {name:'cobalt',    bg:'#061222', plat:'#2b6cff', player:'#f1f7ff', banner:'#0b1640', border:'#a9c4ff', filter:'brightness(1.05)'}
+      {name:'crt', bg:'#111016', plat:'#39ff14', player:'#f4f4f4', banner:'#1a1a1a', border:'#86ffb6', filter:'contrast(1.05)'},
+      {name:'neon', bg:'#0b0d1a', plat:'#ff61d8', player:'#ffffff', banner:'#201235', border:'#ff9dee', filter:'saturate(1.2)'},
+      {name:'vapor', bg:'#1a1224', plat:'#7cc7ff', player:'#ffe5ff', banner:'#1c1730', border:'#9ac7ff', filter:'brightness(1.05)'},
+      {name:'greenscr', bg:'#00190c', plat:'#39ff14', player:'#e8ffe8', banner:'#00130a', border:'#86ffb6', filter:'contrast(1.1)'},
+      {name:'amber', bg:'#1a1300', plat:'#ffb000', player:'#fff3d0', banner:'#291f00', border:'#ffd36a', filter:'contrast(1.08)'},
+      {name:'candy', bg:'#161018', plat:'#ff79c6', player:'#f8f8f2', banner:'#221324', border:'#ffb3e1', filter:'saturate(1.15)'},
+      {name:'dusk',  bg:'#0f1326', plat:'#7df9ff', player:'#e6e6e6', banner:'#101b3a', border:'#b3ecff', filter:'brightness(1.06)'},
+      {name:'cobalt',bg:'#061222', plat:'#2b6cff', player:'#f1f7ff', banner:'#0b1640', border:'#a9c4ff', filter:'brightness(1.05)'}
     ];
 
     let ACTIVE = {...BASE};
@@ -159,14 +234,13 @@
 
     // ===== Tags/Captions =====
     const TREND_TAGS = (params.get('tags')?.split(',') || [
-      '#BeatMyScore','#DuetThis','#Streak','#Speedrun','#OneMoreTry','#Retro','#PixelArt','#Art','#Vaporware','#HTML5Game', 'SpaceGame', 'Gent', 'Belgium', 'Spectrum Gent', 'Programmeren'
+      '#BeatMyScore','#DuetThis','#Streak','#Speedrun','#OneMoreTry','#Retro','#PixelArt','#HTML5Game', 'SpaceGame', 'Gent', 'Belgium', 'Spectrum Gent', 'Programmeren'
     ]).slice(0,10);
     const CAPTIONS = [
       'Beat my SEED op TikTok :)',
       'Duet met je highscore!',
       'Kun jij dit level halen zonder te vallen? 🔥',
     ];
-    const HARD = params.get('hard') === '1';
     const REC  = params.get('rec') === '1';
     if (REC) document.getElementById('rec').style.display = 'inline-block';
 
@@ -187,6 +261,8 @@
     const btnCaption = document.getElementById('copyCaption');
     const btnShare   = document.getElementById('shareSeed');
 
+    let CURRENT_BASE_SPEED = Number.isFinite(SPEED_PARAM) ? SPEED_PARAM : (HARD ? 3.8 : 3.0);
+
     function buildCaption(){
       const line = pick(CAPTIONS);
       const tags = TREND_TAGS.join(' ');
@@ -200,6 +276,7 @@
       url.searchParams.set('seed', String(SEED));
       url.searchParams.set('trend', THEME_NAME);
       if (HARD) url.searchParams.set('hard','1');
+      if (Number.isFinite(CURRENT_BASE_SPEED)) url.searchParams.set('speed', String(CURRENT_BASE_SPEED));
       try{ await navigator.clipboard.writeText(url.toString()); btnShare.textContent='✓ Link copied!'; setTimeout(()=>btnShare.textContent='Copy challenge link',1200);}catch{}
     });
 
@@ -224,68 +301,29 @@
     function sfxCrash(){
       if(!audioReady) return;
       const now = audioCtx.currentTime;
-
-      // 1) Snelle 8-bit “fall” (twee golven dalen tegelijk)
-      const o1 = audioCtx.createOscillator();
-      const o2 = audioCtx.createOscillator();
-      const g1 = audioCtx.createGain();
-      o1.type = 'square';
-      o2.type = 'triangle';
-
-      o1.frequency.setValueAtTime(800, now);
-      o1.frequency.exponentialRampToValueAtTime(90, now + 0.35);
-      o2.frequency.setValueAtTime(1200, now);
-      o2.frequency.exponentialRampToValueAtTime(120, now + 0.35);
-
-      g1.gain.setValueAtTime(0.28, now);
-      g1.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
-
-      o1.connect(g1); o2.connect(g1); g1.connect(audioCtx.destination);
-      o1.start(now);  o2.start(now);
-      o1.stop(now + 0.40); o2.stop(now + 0.40);
-
-      // 2) Korte noise-burst met low-pass sweep (explosief randje)
-      const durNoise = 0.25;
-      const noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * durNoise, audioCtx.sampleRate);
-      const data = noiseBuf.getChannelData(0);
-      for (let i = 0; i < data.length; i++) {
-        // white noise met natuurlijke decay
-        data[i] = (Math.random()*2 - 1) * (1 - i / data.length);
-      }
-      const noise = audioCtx.createBufferSource();
-      noise.buffer = noiseBuf;
-
-      const lp = audioCtx.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.frequency.setValueAtTime(1200, now);
-      lp.frequency.exponentialRampToValueAtTime(220, now + 0.25);
-
-      const gN = audioCtx.createGain();
-      gN.gain.setValueAtTime(0.35, now + 0.02);   // iets later inzetten
-      gN.gain.linearRampToValueAtTime(0.0001, now + 0.27);
-
-      noise.connect(lp).connect(gN).connect(audioCtx.destination);
-      noise.start(now + 0.02);
-      noise.stop(now + 0.30);
-
-      // 3) Afsluitende “hit” (laag, detuned gevoel)
-      const hit = audioCtx.createOscillator();
-      const g2  = audioCtx.createGain();
-      hit.type = 'square';
-      hit.frequency.setValueAtTime(180, now + 0.32);
-      hit.frequency.exponentialRampToValueAtTime(60,  now + 0.52);
-      g2.gain.setValueAtTime(0.18, now + 0.32);
-      g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
-      hit.connect(g2).connect(audioCtx.destination);
-      hit.start(now + 0.32);
-      hit.stop(now + 0.56);
+      const o1 = audioCtx.createOscillator(); const o2 = audioCtx.createOscillator(); const g1 = audioCtx.createGain();
+      o1.type='square'; o2.type='triangle';
+      o1.frequency.setValueAtTime(800, now); o1.frequency.exponentialRampToValueAtTime(90, now + 0.35);
+      o2.frequency.setValueAtTime(1200, now); o2.frequency.exponentialRampToValueAtTime(120, now + 0.35);
+      g1.gain.setValueAtTime(0.28, now); g1.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+      o1.connect(g1); o2.connect(g1); g1.connect(audioCtx.destination); o1.start(now); o2.start(now); o1.stop(now+0.4); o2.stop(now+0.4);
+      const durNoise = 0.25; const noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * durNoise, audioCtx.sampleRate);
+      const data = noiseBuf.getChannelData(0); for (let i=0;i<data.length;i++) data[i]=(Math.random()*2 - 1)*(1 - i/data.length);
+      const noise = audioCtx.createBufferSource(); noise.buffer=noiseBuf;
+      const lp = audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.setValueAtTime(1200, now); lp.frequency.exponentialRampToValueAtTime(220, now + 0.25);
+      const gN = audioCtx.createGain(); gN.gain.setValueAtTime(0.35, now + 0.02); gN.gain.linearRampToValueAtTime(0.0001, now + 0.27);
+      noise.connect(lp).connect(gN).connect(audioCtx.destination); noise.start(now + 0.02); noise.stop(now + 0.30);
+      const hit = audioCtx.createOscillator(); const g2  = audioCtx.createGain();
+      hit.type='square'; hit.frequency.setValueAtTime(180, now + 0.32); hit.frequency.exponentialRampToValueAtTime(60,  now + 0.52);
+      g2.gain.setValueAtTime(0.18, now + 0.32); g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+      hit.connect(g2).connect(audioCtx.destination); hit.start(now + 0.32); hit.stop(now + 0.56);
     }
-
     function sfxChirp(){ beep({freq:2200,dur:0.03,gain:0.07}); setTimeout(()=>beep({freq:2600,dur:0.035,gain:0.06}),45); }
     function sfxMotivate(){ beep({freq:1400,dur:0.05,gain:0.18}); setTimeout(()=>beep({freq:1800,dur:0.05,gain:0.16}),45); }
     function sfxLevel(){ beep({freq:880,dur:0.05,gain:0.20}); setTimeout(()=>beep({freq:1175,dur:0.06,gain:0.18}),60); setTimeout(()=>beep({freq:1568,dur:0.07,gain:0.16}),120); }
     function primeAudio(){ ensureAudio(); removeEventListener('pointerdown',primeAudio); removeEventListener('keydown',primeAudio); }
-    addEventListener('pointerdown',primeAudio,{once:true}); addEventListener('keydown',primeAudio,{once:true});
+    addEventListener('pointerdown',primeAudio,{once:true});
+    addEventListener('keydown',primeAudio,{once:true});
 
     // ===== Clouds =====
     const CLOUD_SPEED = 1.15;
@@ -308,8 +346,7 @@
       ctx.save(); ctx.translate(30*c.scale,-20*c.scale);
       ctx.font=`700 ${fontSize|0}px monospace`;
       ctx.textBaseline='top';
-      ctx.shadowColor='rgba(0,0,0,0.6)';
-      ctx.shadowBlur=6;
+      ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=6;
       const text = c.text || pick(['DUET: BEAT THIS SEED','LEER CODEN IN 15s','SIGMA JUMP? TRY IT','RETRO MODE 🔁','NO MISS STREAK 🔥']);
       const textW=ctx.measureText(text).width;
       const w=textW+padX*2, h=fontSize+padY*2, r=5*bannerScale;
@@ -377,28 +414,18 @@
     let lastEmoji = null;
     function pickStreakEmoji(streak){
       let e = STREAK_EMOJIS[(rand()*STREAK_EMOJIS.length)|0];
-      if (e === lastEmoji && STREAK_EMOJIS.length > 1) {
-        e = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length];
-      }
+      if (e === lastEmoji && STREAK_EMOJIS.length > 1) e = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length];
       lastEmoji = e;
       if (streak >= 5 && rand() < 0.20) {
         let e2 = STREAK_EMOJIS[(rand()*STREAK_EMOJIS.length)|0];
-        if (e2 === e && STREAK_EMOJIS.length > 1) {
-          e2 = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length];
-        }
+        if (e2 === e && STREAK_EMOJIS.length > 1) e2 = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length];
         return { text: e + " " + e2, combo: true };
       }
       return { text: e, combo: false };
     }
     const MOTOS = [
-      "✨ PERFECT!",
-      "🔥 You are nailing it",
-      "💪 Yes you can",
-      "😎 Oké José",
-      "🎯 Keep it rolling",
-      "🧠 Big brain moves",
-      "🚀 Speedrun vibes",
-      "🥷 Clean jumps!"
+      "✨ PERFECT!","🔥 You are nailing it","💪 Yes you can","😎 Oké José",
+      "🎯 Keep it rolling","🧠 Big brain moves","🚀 Speedrun vibes","🥷 Clean jumps!"
     ];
 
     // ===== Game state =====
@@ -412,7 +439,7 @@
     let streak = 0;
     let popups = [];
     let platformIdCounter = 1;
-    let lastCountedPlatformId = 0; // om 1-per-platform te garanderen
+    let lastCountedPlatformId = 0;
 
     function addPopup(msg,x,y,style='normal'){ popups.push({msg,x,y,age:0,style}); }
 
@@ -436,47 +463,115 @@
       addPopup('🎨 PALETTE SHIFT!', player.x-30, Math.max(28, player.y-72), 'perfect');
     }
 
-    // ===== Level gen =====
+    // ===== Nieuwe eisen =====
+    // Snelheid: +10% per level (i.p.v. 5%)
+    function currentScroll(){ return CURRENT_BASE_SPEED * Math.pow(1.10, (level - 1)); }
+
+    // Gaps schalen zachtjes met level (max +30%)
+    function levelGapMultiplier(){
+      return Math.min(1.3, 1 + 0.10 * (level - 1)); // L1:1.00, L2:1.10, L3:1.20, L4+:1.30
+    }
+
+    // ===== Sprongfysica en gap-berekening =====
+    function timeToReachDeltaY(deltaY){
+      const g = gravity, vy0 = jumpVY;         // jumpVY < 0
+      const disc = vy0*vy0 + 2*g*deltaY;
+      if (disc < 0) return 0;
+      const tHit = (-vy0 + Math.sqrt(disc)) / g;   // neerwaartse wortel
+      const tMax = (-2*vy0) / g;                   // terug op start-hoogte
+      return Math.max(0, Math.min(tHit, tMax));
+    }
+
+    function targetGap(prev, nextY, scr, nextW){
+      const tLand = Math.max(0.28, timeToReachDeltaY(nextY - prev.y)); // tijd tot landen
+      const desiredLeftAtLand = player.x - nextW*0.5;
+
+      let gap = scr * tLand + (desiredLeftAtLand - (prev.x + prev.w));
+
+      // basis clamps
+      const minGap = 60;
+      const physicsClamp = scr * tLand * 0.95 + nextW * 0.65;
+      const speedClamp   = 120 + Math.max(0, (scr - 2.4)) * 45;
+
+      // jitter groeit licht met level
+      const baseJitter = 10 + level * 1.5;
+      gap += (rand()*baseJitter - baseJitter/2);
+
+      // level multiplier
+      const gapMult = levelGapMultiplier();
+      gap *= gapMult;
+
+      const maxGap = Math.max(minGap+10, Math.min(speedClamp, physicsClamp)) * gapMult;
+      gap = clamp(gap, minGap, maxGap);
+
+      return { gap, tLand };
+    }
+
+    // ===== Level reset + initiële platforms =====
     function reset(){
       score=0; scoreEl.textContent=score;
       platforms=[]; clouds=[]; birds=[]; lastWasHardGap=false;
       platformIdCounter = 1;
       lastCountedPlatformId = 0;
+
       for(let i=0;i<6;i++) spawnCloud(false);
       for(let i=0;i<2;i++) spawnBird(false);
+
       const baseY=H*0.58, baseX=player.x-60;
-      platforms.push({id:platformIdCounter++, x:baseX,y:baseY,w:120,h:10});
+
+      // Startplatform (extra lang)
+      const startPlat = {id:platformIdCounter++, x:baseX,y:baseY,w:360,h:10};
+      platforms.push(startPlat);
+
       player.y=baseY-player.r; player.vy=0; player.onGround=true;
-      lastCountedPlatformId = platforms[0].id; // startplatform telt niet
+      lastCountedPlatformId = startPlat.id; // startplatform telt niet
+
+      // Volgende platforms met gevarieerde breedtes en gaps
+      let prev = startPlat;
       for(let i=1;i<8;i++){
-        const prev=platforms[i-1];
-        const x=prev.x+180+(rand()*40-20);
-        const y=Math.max(H*0.45,Math.min(H*0.85, baseY+Math.sin(i*0.6)*40+(rand()*40-20)));
-        platforms.push({id:platformIdCounter++, x,y,w:120,h:10});
+        const w = (110 + (rand()*30)|0); // 110–140px
+        const vertAmp = (CURRENT_BASE_SPEED <= 2.6 ? 18 : 26);
+        const y = clamp(
+          prev.y + Math.sin(i*0.55)*vertAmp + (rand()*vertAmp - vertAmp/2),
+          H*0.50, H*0.80
+        );
+        const { gap } = targetGap(prev, y, CURRENT_BASE_SPEED, w);
+        const x = prev.x + prev.w + gap;
+        const p = {id:platformIdCounter++, x, y, w, h:10};
+        platforms.push(p);
+        prev = p;
       }
+
       applyTheme(BASE);
       level = 1;
       streak = 0;
       platFlash = 0;
       lastPaletteName = null;
     }
+
+    // ===== Generator voor volgende platform =====
     function nextPlatform(prev){
-      const makeHard=!lastWasHardGap && (HARD ? rand()<0.35 : rand()<0.22);
-      let x,y;
-      if(makeHard){
-        x=prev.x+240+(rand()*40-20);
-        y=Math.max(H*0.50, Math.min(H*0.80, prev.y+(rand()*20-10)));
-      } else {
-        x=prev.x+180+(rand()*40-20);
-        y=Math.max(H*0.45, Math.min(H*0.85, prev.y+Math.sin(t*0.06+rand())*40+(rand()*40-20)));
-      }
-      lastWasHardGap=makeHard;
-      return {x,y};
+      const wantHard = !lastWasHardGap && (CURRENT_BASE_SPEED > 3.2 ? rand()<0.22 : rand()<0.12);
+      const baseAmp = (CURRENT_BASE_SPEED <= 2.6 ? 16 : 24);
+      const y = clamp(
+        prev.y + (wantHard ? (rand()*baseAmp - baseAmp/2)
+                           : (Math.sin(t*0.06+rand())*baseAmp + (rand()*baseAmp - baseAmp/2))),
+        H*0.50, H*0.80
+      );
+
+      // Breedte variëren per platform
+      const w = (100 + (rand()*40)|0); // 100–140px
+      const scr = currentScroll();
+      const { gap } = targetGap(prev, y, scr, w);
+
+      lastWasHardGap = wantHard;
+      return { x: prev.x + prev.w + gap, y, w };
     }
+
     function spawn(){
       const last=platforms[platforms.length-1];
       const np=nextPlatform(last);
-      platforms.push({id:platformIdCounter++, x:np.x,y:np.y,w:120,h:10});
+      platforms.push({id:platformIdCounter++, x:np.x,y:np.y,w:np.w,h:10});
       if(platforms.length>10) platforms.shift();
     }
 
@@ -487,14 +582,8 @@
         player.vy=jumpVY; player.onGround=false; sfxJump();
       }
     }
-    addEventListener('keydown',e=>{ if(e.code==='Space') jump(); });
-    addEventListener('pointerdown',e=>{
-      if(gameOver){
-        const isLink = e.target.closest && e.target.closest('a,button');
-        if(isLink) return;
-      }
-      jump();
-    });
+    addEventListener('keydown',e=>{ if(e.code==='Space'|| e.code === 'ArrowUp') jump(); });
+    canvas.addEventListener('pointerdown', ()=>{ jump(); }, {passive:true});
 
     // ===== Game Over + HUD =====
     function showGameOver(){ gameOver = true; finalScoreEl.textContent = score; overlay.style.display = 'grid'; }
@@ -515,15 +604,13 @@
 
     // ===== Main loop =====
     let prevOnGround = true;
-    let lastTS = performance.now(); // <-- toegevoegd
+    let lastTS = performance.now();
 
     function loop(ts){
       if (ts === undefined) ts = performance.now();
-      // delta in "60-fps frames": 1.0 ≈ 16.6667 ms
-      const dt = Math.min(50, ts - lastTS) / 16.6667; // cap grote sprongen (tab switch)
+      const dt = Math.min(50, ts - lastTS) / 16.6667;
       lastTS = ts;
 
-      // tijd/animatie teller
       t += dt;
 
       if(!gameOver){
@@ -538,9 +625,8 @@
         while(clouds.length && clouds[0].x < -260) clouds.shift();
         if(!clouds.length || clouds[clouds.length-1].x < W-260){ if(rand()<0.6*dt) spawnCloud(true); }
 
-        // scroll (5% sneller per level)
-        const BASE_SCROLL = HARD ? 3.8 : 3.0;
-        const SCROLL = BASE_SCROLL * Math.pow(1.05, (level - 1));
+        // scroll (10% sneller per level)
+        const SCROLL = currentScroll();
         for (const p of platforms) p.x -= SCROLL * dt;
 
         // spawn nieuwe platforms als de eerste weg is
@@ -559,29 +645,23 @@
           }
         }
 
-        // landing event = net op de grond NA in de lucht
+        // landing event
         if (player.onGround && !wasOnGround && platformUnderfoot) {
           if (platformUnderfoot.id !== lastCountedPlatformId) {
-            // 1) Score + streak
             score++; scoreEl.textContent = score;
             streak++;
             lastCountedPlatformId = platformUnderfoot.id;
 
-            // 2) Elke 3 landingen: emoji-streak
             if (streak % 3 === 0) {
-              const pickRes = pickStreakEmoji(streak);
+              const pickRes = (function(st){ let res; let e = STREAK_EMOJIS[(rand()*STREAK_EMOJIS.length)|0]; if (e === lastEmoji && STREAK_EMOJIS.length > 1) e = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length]; lastEmoji = e; if (st >= 5 && rand() < 0.20) { let e2 = STREAK_EMOJIS[(rand()*STREAK_EMOJIS.length)|0]; if (e2 === e && STREAK_EMOJIS.length > 1) e2 = STREAK_EMOJIS[((rand()*STREAK_EMOJIS.length)|0 + 1) % STREAK_EMOJIS.length]; res = { text: e + " " + e2, combo: true }; } else res = { text: e, combo: false }; return res; })(streak);
               addPopup(`${pickRes.text} STREAK x${streak}`, player.x+20, Math.max(40, player.y-40), 'streak');
               if (pickRes.combo) triggerFlash(0.55, true);
             }
-
-            // 3) Elke 5 streaks: motivatie + sfx
             if (streak % 5 === 0) {
               addPopup(pick(MOTOS), player.x-18, Math.max(30, player.y-64), 'perfect');
               sfxMotivate();
               triggerFlash(0.7, true);
             }
-
-            // 4) Elke 10 streaks: level up + palette + sfx
             if (streak % 10 === 0) {
               level++;
               switchRetroPalette();
@@ -633,23 +713,17 @@
       for(let i=popups.length-1;i>=0;i--){
         const p=popups[i];
         p.age++;
-        const life =
-          p.style==='level'    ? 80 :
-          p.style==='perfect'  ? 72 :
-          p.style==='streak'   ? 60 : 60;
-
+        const life = p.style==='level' ? 80 : p.style==='perfect' ? 72 : 60;
         const alpha = Math.max(0, 1 - p.age/life);
         const scale = 1 + Math.max(0, (12 - p.age) / 60);
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.translate(p.x, p.y - p.age*0.5);
         ctx.scale(scale, scale);
-
         let font = '700 16px monospace';
         let fill = '#ffffff';
         if (p.style==='perfect') { font='800 18px monospace'; fill='#ffe9a8'; }
         if (p.style==='level')   { font='800 20px monospace'; fill='#c7fff0'; }
-
         ctx.font = font;
         ctx.fillStyle = fill;
         ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth=3;
@@ -665,17 +739,26 @@
       requestAnimationFrame(loop);
     }
 
-    function start(){ hideGameOver(); reset(); loop(); }
-    start();
+    function start(){
+      CURRENT_BASE_SPEED = Number.isFinite(chosenSpeed) ? chosenSpeed
+                         : Number.isFinite(SPEED_PARAM) ? SPEED_PARAM
+                         : BASE_SCROLL_FALLBACK;
+      hideGameOver();
+      reset();
+      lastTS = performance.now();
+      loop();
+    }
+    // start via Start-knop
 
     // ===== Mini API =====
     const game = {
       get score(){ return score; },
       set score(v){ score = v|0; scoreEl.textContent = score; },
       flash(){ document.body.style.filter='invert(1) hue-rotate(180deg)'; setTimeout(()=>document.body.style.filter=ACTIVE.filter||'none',200); },
-      seed: SEED, theme: THEME_NAME, hard: (params.get('hard')==='1')
+      seed: SEED, theme: THEME_NAME, hard: HARD
     };
     window.game = game;
+
     </script>
   </body>
 </html>
