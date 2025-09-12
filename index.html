@@ -515,26 +515,33 @@
 
     // ===== Main loop =====
     let prevOnGround = true;
+    let lastTS = performance.now(); // <-- toegevoegd
 
-    function loop(){
-      t++;
+    function loop(ts){
+      if (ts === undefined) ts = performance.now();
+      // delta in "60-fps frames": 1.0 ≈ 16.6667 ms
+      const dt = Math.min(50, ts - lastTS) / 16.6667; // cap grote sprongen (tab switch)
+      lastTS = ts;
+
+      // tijd/animatie teller
+      t += dt;
 
       if(!gameOver){
         const wasOnGround = prevOnGround;
 
         // physics
-        player.vy += gravity;
-        player.y  += player.vy;
+        player.vy += gravity * dt;
+        player.y  += player.vy * dt;
 
         // clouds
-        for(const c of clouds) c.x -= CLOUD_SPEED * (0.85 + (c.scale - 1) * 0.35);
+        for(const c of clouds) c.x -= CLOUD_SPEED * (0.85 + (c.scale - 1) * 0.35) * dt;
         while(clouds.length && clouds[0].x < -260) clouds.shift();
-        if(!clouds.length || clouds[clouds.length-1].x < W-260){ if(rand()<0.6) spawnCloud(true); }
+        if(!clouds.length || clouds[clouds.length-1].x < W-260){ if(rand()<0.6*dt) spawnCloud(true); }
 
         // scroll (5% sneller per level)
         const BASE_SCROLL = HARD ? 3.8 : 3.0;
         const SCROLL = BASE_SCROLL * Math.pow(1.05, (level - 1));
-        for (const p of platforms) p.x -= SCROLL;
+        for (const p of platforms) p.x -= SCROLL * dt;
 
         // spawn nieuwe platforms als de eerste weg is
         if(platforms[0].x + platforms[0].w < 0){ spawn(); }
@@ -653,7 +660,7 @@
       }
 
       // flash decay
-      platFlash *= 0.90;
+      platFlash *= Math.pow(0.90, dt);
 
       requestAnimationFrame(loop);
     }
