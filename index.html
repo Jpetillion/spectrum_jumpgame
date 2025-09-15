@@ -440,6 +440,7 @@
     let popups = [];
     let platformIdCounter = 1;
     let lastCountedPlatformId = 0;
+    let lastGap = null; // onthoud de vorige gap om grote variatie af te dwingen
 
     function addPopup(msg,x,y,style='normal'){ popups.push({msg,x,y,age:0,style}); }
 
@@ -482,30 +483,50 @@
       return Math.max(0, Math.min(tHit, tMax));
     }
 
-    function targetGap(prev, nextY, scr, nextW){
-      const tLand = Math.max(0.28, timeToReachDeltaY(nextY - prev.y)); // tijd tot landen
-      const desiredLeftAtLand = player.x - nextW*0.5;
+    // VERVANG targetGap(...) door:
+    function computeGap(prev, nextY, scr, nextW){
+    // tijd tot landen o.b.v. hoogteverschil
+    const tLand   = Math.max(0.25, timeToReachDeltaY(nextY - prev.y));
+    const reach   = scr * tLand;                 // horizontale “wereldverplaatsing” t/m landing
+    const lvlMul  = Math.min(1.15, 1 + 0.05*(level - 1)); // veel zachtere level-schaal
 
-      let gap = scr * tLand + (desiredLeftAtLand - (prev.x + prev.w));
+    // STRAKKERE MAX: kleiner dan fysiek kan om “te grote” gaps te vermijden
+    // (0.65*reach + 0.35*nextW) is conservatiever dan je vorige formule
+    const MAX     = Math.max(68, (0.65*reach + 0.35*nextW)) * lvlMul;
 
-      // basis clamps
-      const minGap = 60;
-      const physicsClamp = scr * tLand * 0.95 + nextW * 0.65;
-      const speedClamp   = 120 + Math.max(0, (scr - 2.4)) * 45;
+    // lager minimum zodat het niet te triviaal is maar duidelijk kleiner blijft
+    const MIN     = 48;
 
-      // jitter groeit licht met level
-      const baseJitter = 10 + level * 1.5;
-      gap += (rand()*baseJitter - baseJitter/2);
-
-      // level multiplier
-      const gapMult = levelGapMultiplier();
-      gap *= gapMult;
-
-      const maxGap = Math.max(minGap+10, Math.min(speedClamp, physicsClamp)) * gapMult;
-      gap = clamp(gap, minGap, maxGap);
-
-      return { gap, tLand };
+    // Variatie in “tientallen %” met drie banden, maar bewust lager getuned
+    function sampleTier(){
+        const r = rand();
+        if (r < 0.55) return randRange(0.65, 0.80);  // klein
+        if (r < 0.92) return randRange(0.81, 0.92);  // midden
+        return randRange(0.93, 0.98);                // spicy, maar nog compact
     }
+
+    // basis-sample
+    let gap = MAX * sampleTier();
+
+    // verschil t.o.v. vorige gap afdwingen (≥15%) om zichtbaar te variëren
+    let tries = 0;
+    while (lastGap !== null && tries < 4) {
+        const rel = Math.abs(gap - lastGap) / Math.max(1, lastGap);
+        if (rel >= 0.15) break;
+        gap = MAX * sampleTier();
+        tries++;
+    }
+
+    // lichte jitter voor natuurlijke spreiding (max ±12%)
+    const jitterPct = Math.min(0.12, 0.08 + 0.01*(level - 1));
+    gap *= (1 + (rand()*2 - 1) * jitterPct);
+
+    // afronden + begrenzen
+    gap = clamp(gap, MIN, MAX) | 0;
+    lastGap = gap;
+    return gap;
+    }
+
 
     // ===== Level reset + initiële platforms =====
     function reset(){
@@ -529,13 +550,16 @@
       // Volgende platforms met gevarieerde breedtes en gaps
       let prev = startPlat;
       for(let i=1;i<8;i++){
-        const w = (110 + (rand()*30)|0); // 110–140px
+        const w = (95 + (rand()*70)|0);
         const vertAmp = (CURRENT_BASE_SPEED <= 2.6 ? 18 : 26);
         const y = clamp(
           prev.y + Math.sin(i*0.55)*vertAmp + (rand()*vertAmp - vertAmp/2),
           H*0.50, H*0.80
         );
-        const { gap } = targetGap(prev, y, CURRENT_BASE_SPEED, w);
+
+        const scr = CURRENT_BASE_SPEED;
+        const gap = computeGap(prev, y, scr, w);
+
         const x = prev.x + prev.w + gap;
         const p = {id:platformIdCounter++, x, y, w, h:10};
         platforms.push(p);
@@ -560,9 +584,11 @@
       );
 
       // Breedte variëren per platform
-      const w = (100 + (rand()*40)|0); // 100–140px
-      const scr = currentScroll();
-      const { gap } = targetGap(prev, y, scr, w);
+      const w = (90 + (rand()*80)|0);
+
+        const scr = currentScroll();
+        const gap = computeGap(prev, y, scr, w);
+
 
       lastWasHardGap = wantHard;
       return { x: prev.x + prev.w + gap, y, w };
